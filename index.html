@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块化计算器 - 实时自定义计算系统</title>
+    <meta name="description" content="在线自定义模块计算器，拖拽模块构建个性化计算工作流">
+    <meta name="keywords" content="计算器,模块化,在线计算,自定义计算,实时计算">
+    <meta name="author" content="模块化计算器">
+    
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3498db">
+    
+    <!-- 样式 -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- 图标 -->
+    <link rel="icon" href="https://img.icons8.com/color/96/calculator--v1.png" type="image/x-icon">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/color/96/calculator--v1.png">
+    
+    <!-- Open Graph 元标签 -->
+    <meta property="og:title" content="模块化计算器 - 实时自定义计算系统">
+    <meta property="og:description" content="在线自定义模块计算器，拖拽模块构建个性化计算工作流">
+    <meta property="og:image" content="https://img.icons8.com/color/96/calculator--v1.png">
+    <meta property="og:url" content="https://yourwebsite.com">
+    <meta property="og:type" content="website">
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div id="loading">
+        <div class="loader">
+            <div class="calculator-icon">
+                <i class="fas fa-calculator"></i>
+            </div>
+            <p>加载模块化计算器...</p>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container" id="mainContainer">
+        <!-- 顶部导航 -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i class="fas fa-calculator"></i>
+                <h1>模块化计算器</h1>
+            </div>
+            <div class="nav-actions">
+                <button class="btn btn-icon" id="helpBtn" title="帮助">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+                <button class="btn btn-icon" id="themeToggle" title="切换主题">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="btn btn-primary" id="newProjectBtn">
+                    <i class="fas fa-plus"></i> 新建项目
+                </button>
+            </div>
+        </nav>
+
+        <div class="main-content">
+            <!-- 左侧模块库 -->
+            <aside class="module-library">
+                <div class="panel-header">
+                    <h2><i class="fas fa-th-large"></i> 模块库</h2>
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="moduleSearch" placeholder="搜索模块...">
+                    </div>
+                </div>
+                
+                <div class="module-categories">
+                    <!-- 输入模块 -->
+                    <div class="category">
+                        <h3 class="category-title" data-category="input">
+                            <i class="fas fa-keyboard"></i> 输入模块
+                        </h3>
+                        <div class="modules-list">
+                            <div class="module-card" data-type="number-input">
+                                <div class="module-icon primary">
+                                    <i class="fas fa-font"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>数字输入</h4>
+                                    <p>输入数字值</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="slider-input">
+                                <div class="module-icon secondary">
+                                    <i class="fas fa-sliders-h"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>滑块输入</h4>
+                                    <p>使用滑块输入值</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="toggle-input">
+                                <div class="module-icon success">
+                                    <i class="fas fa-toggle-on"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>开关输入</h4>
+                                    <p>布尔值开关</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 数学运算 -->
+                    <div class="category">
+                        <h3 class="category-title" data-category="math">
+                            <i class="fas fa-calculator"></i> 数学运算
+                        </h3>
+                        <div class="modules-list">
+                            <div class="module-card" data-type="addition">
+                                <div class="module-icon success">
+                                    <i class="fas fa-plus"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>加法器</h4>
+                                    <p>A + B</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="subtraction">
+                                <div class="module-icon danger">
+                                    <i class="fas fa-minus"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>减法器</h4>
+                                    <p>A - B</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="multiplication">
+                                <div class="module-icon warning">
+                                    <i class="fas fa-times"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>乘法器</h4>
+                                    <p>A × B</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="division">
+                                <div class="module-icon info">
+                                    <i class="fas fa-divide"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>除法器</h4>
+                                    <p>A ÷ B</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 高级运算 -->
+                    <div class="category">
+                        <h3 class="category-title" data-category="advanced">
+                            <i class="fas fa-chart-line"></i> 高级运算
+                        </h3>
+                        <div class="modules-list">
+                            <div class="module-card" data-type="percentage">
+                                <div class="module-icon purple">
+                                    <i class="fas fa-percentage"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>百分比</h4>
+                                    <p>计算百分比</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="average">
+                                <div class="module-icon teal">
+                                    <i class="fas fa-chart-bar"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>平均值</h4>
+                                    <p>计算平均值</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="power">
+                                <div class="module-icon orange">
+                                    <i class="fas fa-superscript"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>幂运算</h4>
+                                    <p>计算 x^y</p>
+                                </div>
+                            </div>
+                            <div class="module-card" data-type="square-root">
+                                <div class="module-icon dark">
+                                    <i class="fas fa-square-root-alt"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>平方根</h4>
+                                    <p>计算 √x</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="library-footer">
+                    <button class="btn btn-block" id="clearAllBtn">
+                        <i class="fas fa-trash-alt"></i> 清空工作区
+                    </button>
+                    <p class="hint">
+                        <i class="fas fa-lightbulb"></i> 提示：拖拽或点击模块添加到工作区
+                    </p>
+                </div>
+            </aside>
+
+            <!-- 中央工作区 -->
+            <main class="workspace">
+                <div class="workspace-header">
+                    <h2><i class="fas fa-desktop"></i> 工作区</h2>
+                    <div class="workspace-stats">
+                        <span id="moduleCount">0 个模块</span>
+                        <span id="connectionCount">0 个连接</span>
+                    </div>
+                </div>
+                
+                <div class="workspace-area" id="workspaceArea">
+                    <!-- 空状态 -->
+                    <div class="empty-workspace" id="emptyWorkspace">
+                        <div class="empty-icon">
+                            <i class="fas fa-arrow-alt-circle-left"></i>
+                        </div>
+                        <h3>工作区是空的</h3>
+                        <p>从左侧模块库拖拽模块到此处开始构建计算流程</p>
+                        <div class="empty-actions">
+                            <button class="btn btn-outline" id="addExampleBtn">
+                                <i class="fas fa-magic"></i> 添加示例
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 模块将在这里动态生成 -->
+                </div>
+                
+                <div class="workspace-footer">
+                    <div class="workspace-controls">
+                        <button class="btn btn-success" id="calculateAllBtn">
+                            <i class="fas fa-bolt"></i> 执行所有计算
+                        </button>
+                        <button class="btn btn-outline" id="exportBtn">
+                            <i class="fas fa-download"></i> 导出配置
+                        </button>
+                        <button class="btn btn-outline" id="importBtn">
+                            <i class="fas fa-upload"></i> 导入配置
+                        </button>
+                        <button class="btn btn-outline" id="saveProjectBtn">
+                            <i class="fas fa-save"></i> 保存项目
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- 右侧属性面板 -->
+            <aside class="property-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-cog"></i> 属性面板</h2>
+                    <button class="btn btn-icon" id="closeProperties">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="property-content" id="propertyContent">
+                    <div class="empty-properties">
+                        <div class="empty-icon">
+                            <i class="fas fa-mouse-pointer"></i>
+                        </div>
+                        <h3>未选择模块</h3>
+                        <p>点击工作区中的模块以查看和编辑其属性</p>
+                    </div>
+                </div>
+                
+                <div class="property-footer">
+                    <div class="property-section">
+                        <h4><i class="fas fa-info-circle"></i> 系统信息</h4>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span>版本</span>
+                                <strong>1.0.0</strong>
+                            </div>
+                            <div class="info-item">
+                                <span>模块数</span>
+                                <strong id="infoModuleCount">0</strong>
+                            </div>
+                            <div class="info-item">
+                                <span>最后计算</span>
+                                <strong id="lastCalcTime">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- 底部状态栏 -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span id="statusMessage">就绪</span>
+            </div>
+            <div class="status-right">
+                <span id="connectionStatus" class="status-indicator connected">
+                    <i class="fas fa-circle"></i> 已连接
+                </span>
+                <span class="status-item">
+                    <i class="fas fa-microchip"></i> CPU: <span id="cpuUsage">0%</span>
+                </span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 帮助模态框 -->
+    <div class="modal" id="helpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-question-circle"></i> 帮助与指南</h2>
+                <button class="btn btn-icon close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3><i class="fas fa-play-circle"></i> 快速开始</h3>
+                    <ol>
+                        <li>从左侧模块库选择模块（点击或拖拽）</li>
+                        <li>将模块添加到工作区</li>
+                        <li>点击模块设置输入值</li>
+                        <li>系统会自动计算并显示结果</li>
+                    </ol>
+                </div>
+                
+                <div class="help-section">
+                    <h3><i class="fas fa-puzzle-piece"></i> 模块类型</h3>
+                    <div class="module-types">
+                        <div class="module-type">
+                            <div class="type-icon primary"><i class="fas fa-keyboard"></i></div>
+                            <div class="type-info">
+                                <h4>输入模块</h4>
+                                <p>提供数据输入功能</p>
+                            </div>
+                        </div>
+                        <div class="module-type">
+                            <div class="type-icon success"><i class="fas fa-calculator"></i></div>
+                            <div class="type-info">
+                                <h4>数学运算</h4>
+                                <p>执行基本数学计算</p>
+                            </div>
+                        </div>
+                        <div class="module-type">
+                            <div class="type-icon warning"><i class="fas fa-chart-line"></i></div>
+                            <div class="type-info">
+                                <h4>高级运算</h4>
+                                <p>执行复杂计算</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="help-section">
+                    <h3><i class="fas fa-keyboard"></i> 快捷键</h3>
+                    <div class="shortcuts">
+                        <div class="shortcut-item">
+                            <kbd>Ctrl + S</kbd>
+                            <span>保存项目</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl + Z</kbd>
+                            <span>撤销</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl + Y</kbd>
+                            <span>重做</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Delete</kbd>
+                            <span>删除选中模块</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary close-modal">开始使用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知区域 -->
+    <div id="notificationArea"></div>
+
+    <!-- 脚本 -->
+    <script src="script.js"></script>
+    
+    <!-- 服务 worker 注册 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').then(registration => {
+                    console.log('ServiceWorker 注册成功: ', registration.scope);
+                }).catch(err => {
+                    console.log('ServiceWorker 注册失败: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
