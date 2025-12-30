@@ -44,7 +44,7 @@
         <nav class="navbar">
             <div class="nav-brand">
                 <i class="fas fa-calculator"></i>
-                <h1>模块化计算器</h1>
+                <h1>模块化计算器 v1.1</h1>
             </div>
             <div class="nav-actions">
                 <button class="btn btn-icon" id="helpBtn" title="帮助">
@@ -213,7 +213,7 @@
                         <i class="fas fa-trash-alt"></i> 清空工作区
                     </button>
                     <p class="hint">
-                        <i class="fas fa-lightbulb"></i> 提示：拖拽或点击模块添加到工作区
+                        <i class="fas fa-lightbulb"></i> 提示：拖拽端口可建立连线
                     </p>
                 </div>
             </aside>
@@ -250,7 +250,7 @@
                 <div class="workspace-footer">
                     <div class="workspace-controls">
                         <button class="btn btn-success" id="calculateAllBtn">
-                            <i class="fas fa-bolt"></i> 执行所有计算
+                            <i class="fas fa-bolt"></i> 执行计算
                         </button>
                         <button class="btn btn-outline" id="exportBtn">
                             <i class="fas fa-download"></i> 导出配置
@@ -335,43 +335,35 @@
                 <div class="help-section">
                     <h3><i class="fas fa-play-circle"></i> 快速开始</h3>
                     <ol>
-                        <li>从左侧模块库选择模块（点击或拖拽）</li>
-                        <li>将模块添加到工作区</li>
-                        <li><strong>新：拖拽端口建立连线连接数据流</strong></li>
-                        <li>点击模块设置输入值</li>
-                        <li>系统会自动计算并显示结果</li>
+                        <li>从左侧模块库拖拽模块到工作区</li>
+                        <li><strong>新功能：拖拽端口建立数据连线</strong></li>
+                        <li>在模块中输入数值或通过连线传递数据</li>
+                        <li>系统会自动计算并显示结果（精确到3位小数）</li>
                     </ol>
                 </div>
                 
                 <div class="help-section">
-                    <h3><i class="fas fa-puzzle-piece"></i> 模块类型</h3>
+                    <h3><i class="fas fa-puzzle-piece"></i> 新增功能</h3>
                     <div class="module-types">
                         <div class="module-type">
-                            <div class="type-icon primary"><i class="fas fa-keyboard"></i></div>
+                            <div class="type-icon"><i class="fas fa-arrows-alt-h"></i></div>
                             <div class="type-info">
-                                <h4>输入模块</h4>
-                                <p>提供数据输入功能</p>
+                                <h4>可视化连线</h4>
+                                <p>拖拽端口建立数据连接</p>
                             </div>
                         </div>
                         <div class="module-type">
-                            <div class="type-icon success"><i class="fas fa-calculator"></i></div>
+                            <div class="type-icon"><i class="fas fa-expand-alt"></i></div>
                             <div class="type-info">
-                                <h4>数学运算</h4>
-                                <p>执行基本数学计算</p>
+                                <h4>工作区缩放</h4>
+                                <p>拖拽右下角调整画布大小</p>
                             </div>
                         </div>
                         <div class="module-type">
-                            <div class="type-icon warning"><i class="fas fa-chart-line"></i></div>
+                            <div class="type-icon"><i class="fas fa-eye"></i></div>
                             <div class="type-info">
-                                <h4>高级运算</h4>
-                                <p>执行复杂计算</p>
-                            </div>
-                        </div>
-                        <div class="module-type">
-                            <div class="type-icon danger"><i class="fas fa-eye"></i></div>
-                            <div class="type-info">
-                                <h4>结果显示</h4>
-                                <p>显示计算结果（三位小数）</p>
+                                <h4>结果显示模块</h4>
+                                <p>专门显示计算结果</p>
                             </div>
                         </div>
                     </div>
@@ -385,20 +377,16 @@
                             <span>保存项目</span>
                         </div>
                         <div class="shortcut-item">
-                            <kbd>Ctrl + Z</kbd>
-                            <span>撤销</span>
-                        </div>
-                        <div class="shortcut-item">
-                            <kbd>Ctrl + Y</kbd>
-                            <span>重做</span>
-                        </div>
-                        <div class="shortcut-item">
                             <kbd>Delete</kbd>
                             <span>删除选中模块</span>
                         </div>
                         <div class="shortcut-item">
                             <kbd>Esc</kbd>
                             <span>取消连线/选择</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>拖拽右下角</kbd>
+                            <span>缩放工作区</span>
                         </div>
                     </div>
                 </div>
