@@ -1,13 +1,261 @@
-// 模块化计算器 - 主应用程序
+// ===== 1. 新增：连线管理器类 =====
+class ConnectionManager {
+    constructor(workspaceElement) {
+        this.connections = [];
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.canvas.id = 'connectionCanvas';
+        this.workspace = workspaceElement;
+        this.draggingConnection = null;
+        this.tempLine = null;
+        
+        this.setupCanvas();
+        this.bindEvents();
+    }
+    
+    setupCanvas() {
+        Object.assign(this.canvas.style, {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            pointerEvents: 'none',
+            zIndex: '5'
+        });
+        this.workspace.appendChild(this.canvas);
+        this.resizeCanvas();
+    }
+    
+    bindEvents() {
+        window.addEventListener('resize', () => this.resizeCanvas());
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.draggingConnection) {
+                this.cleanupDrag();
+            }
+        });
+    }
+    
+    resizeCanvas() {
+        const rect = this.workspace.getBoundingClientRect();
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+        this.canvas.style.width = `${rect.width}px`;
+        this.canvas.style.height = `${rect.height}px`;
+        this.drawAll();
+    }
+    
+    getPortPosition(moduleId, portType, portIndex) {
+        const moduleEl = document.getElementById(moduleId);
+        if (!moduleEl) return null;
+        
+        const workspaceRect = this.workspace.getBoundingClientRect();
+        const portSelector = `.port.${portType}[data-index="${portIndex}"]`;
+        const portEl = moduleEl.querySelector(portSelector);
+        
+        if (!portEl) return null;
+        
+        const portRect = portEl.getBoundingClientRect();
+        return {
+            x: portRect.left - workspaceRect.left + portRect.width / 2,
+            y: portRect.top - workspaceRect.top + portRect.height / 2
+        };
+    }
+    
+    drawConnection(conn) {
+        const start = this.getPortPosition(conn.sourceModule, 'output', conn.sourcePort);
+        const end = this.getPortPosition(conn.targetModule, 'input', conn.targetPort);
+        
+        if (!start || !end) return;
+        
+        // 绘制贝塞尔曲线
+        this.ctx.beginPath();
+        const cp1 = { x: start.x + 60, y: start.y };
+        const cp2 = { x: end.x - 60, y: end.y };
+        this.ctx.moveTo(start.x, start.y);
+        this.ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+        
+        this.ctx.strokeStyle = '#3498db';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+        
+        // 绘制箭头
+        const angle = Math.atan2(end.y - cp2.y, end.x - cp2.x);
+        this.ctx.beginPath();
+        this.ctx.moveTo(end.x, end.y);
+        this.ctx.lineTo(
+            end.x - 10 * Math.cos(angle - Math.PI / 6),
+            end.y - 10 * Math.sin(angle - Math.PI / 6)
+        );
+        this.ctx.lineTo(
+            end.x - 10 * Math.cos(angle + Math.PI / 6),
+            end.y - 10 * Math.sin(angle + Math.PI / 6)
+        );
+        this.ctx.closePath();
+        this.ctx.fillStyle = '#3498db';
+        this.ctx.fill();
+    }
+    
+    drawTempLine(fromX, fromY, toX, toY) {
+        this.drawAll(); // 重绘所有固定连线
+        this.ctx.beginPath();
+        this.ctx.moveTo(fromX, fromY);
+        this.ctx.lineTo(toX, toY);
+        this.ctx.strokeStyle = '#3498db';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 3]);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+    }
+    
+    drawAll() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.connections.forEach(conn => this.drawConnection(conn));
+    }
+    
+    addConnection(sourceModule, sourcePort, targetModule, targetPort) {
+        // 检查是否已存在相同连接
+        const exists = this.connections.some(conn => 
+            conn.sourceModule === sourceModule && 
+            conn.sourcePort === sourcePort &&
+            conn.targetModule === targetModule && 
+            conn.targetPort === targetPort
+        );
+        
+        if (!exists) {
+            const newConn = { sourceModule, sourcePort, targetModule, targetPort };
+            this.connections.push(newConn);
+            this.drawAll();
+            
+            // 更新端口连接状态
+            this.updatePortConnectionState(sourceModule, 'output', sourcePort, true);
+            this.updatePortConnectionState(targetModule, 'input', targetPort, true);
+            
+            return newConn;
+        }
+        return null;
+    }
+    
+    removeConnection(sourceModule, sourcePort, targetModule, targetPort) {
+        const index = this.connections.findIndex(conn => 
+            conn.sourceModule === sourceModule && 
+            conn.sourcePort === sourcePort &&
+            conn.targetModule === targetModule && 
+            conn.targetPort === targetPort
+        );
+        
+        if (index > -1) {
+            this.connections.splice(index, 1);
+            this.drawAll();
+            
+            // 更新端口连接状态
+            this.updatePortConnectionState(sourceModule, 'output', sourcePort, false);
+            this.updatePortConnectionState(targetModule, 'input', targetPort, false);
+        }
+    }
+    
+    removeConnectionsTo(moduleId) {
+        this.connections = this.connections.filter(conn => {
+            if (conn.sourceModule === moduleId || conn.targetModule === moduleId) {
+                // 更新断开连接的端口状态
+                if (conn.sourceModule === moduleId) {
+                    this.updatePortConnectionState(conn.sourceModule, 'output', conn.sourcePort, false);
+                }
+                if (conn.targetModule === moduleId) {
+                    this.updatePortConnectionState(conn.targetModule, 'input', conn.targetPort, false);
+                }
+                return false;
+            }
+            return true;
+        });
+        this.drawAll();
+    }
+    
+    updatePortConnectionState(moduleId, portType, portIndex, connected) {
+        const moduleEl = document.getElementById(moduleId);
+        if (!moduleEl) return;
+        
+        const portEl = moduleEl.querySelector(`.port.${portType}[data-index="${portIndex}"]`);
+        if (portEl) {
+            if (connected) {
+                portEl.classList.add('connected');
+            } else {
+                portEl.classList.remove('connected');
+            }
+        }
+    }
+    
+    startDrag(sourceModule, sourcePort, clientX, clientY) {
+        const workspaceRect = this.workspace.getBoundingClientRect();
+        const startPos = this.getPortPosition(sourceModule, 'output', sourcePort);
+        
+        if (!startPos) return;
+        
+        this.draggingConnection = {
+            sourceModule,
+            sourcePort,
+            startPos
+        };
+        
+        this.tempLine = {
+            fromX: startPos.x,
+            fromY: startPos.y,
+            toX: clientX - workspaceRect.left,
+            toY: clientY - workspaceRect.top
+        };
+        
+        this.drawTempLine(this.tempLine.fromX, this.tempLine.fromY, this.tempLine.toX, this.tempLine.toY);
+    }
+    
+    updateDrag(clientX, clientY) {
+        if (!this.draggingConnection || !this.tempLine) return;
+        
+        const workspaceRect = this.workspace.getBoundingClientRect();
+        this.tempLine.toX = clientX - workspaceRect.left;
+        this.tempLine.toY = clientY - workspaceRect.top;
+        
+        this.drawTempLine(this.tempLine.fromX, this.tempLine.fromY, this.tempLine.toX, this.tempLine.toY);
+    }
+    
+    finishDrag(targetModule, targetPort) {
+        if (!this.draggingConnection) return null;
+        
+        const { sourceModule, sourcePort } = this.draggingConnection;
+        const newConnection = this.addConnection(sourceModule, sourcePort, targetModule, targetPort);
+        
+        this.cleanupDrag();
+        return newConnection;
+    }
+    
+    cleanupDrag() {
+        this.draggingConnection = null;
+        this.tempLine = null;
+        this.drawAll();
+    }
+    
+    getConnectionsForModule(moduleId) {
+        return this.connections.filter(conn => 
+            conn.sourceModule === moduleId || conn.targetModule === moduleId
+        );
+    }
+    
+    getInputConnections(moduleId, inputIndex) {
+        return this.connections.filter(conn => 
+            conn.targetModule === moduleId && conn.targetPort === inputIndex
+        );
+    }
+}
+
+// ===== 2. 模块化计算器 - 主应用程序 =====
 class ModularCalculator {
     constructor() {
         this.modules = [];
-        this.connections = [];
         this.selectedModuleId = null;
         this.moduleCounter = 0;
         this.lastCalculationTime = null;
         this.isDarkTheme = false;
         this.history = [];
+        
+        // 初始化连线管理器
+        this.connectionManager = new ConnectionManager(document.getElementById('workspaceArea'));
         
         this.init();
     }
@@ -90,23 +338,40 @@ class ModularCalculator {
         const workspace = document.getElementById('workspaceArea');
         workspace.addEventListener('dragover', (e) => {
             e.preventDefault();
-            workspace.classList.add('drag-over');
-        });
-        
-        workspace.addEventListener('dragleave', () => {
-            workspace.classList.remove('drag-over');
         });
         
         workspace.addEventListener('drop', (e) => {
             e.preventDefault();
-            workspace.classList.remove('drag-over');
-            
             const moduleType = e.dataTransfer.getData('moduleType');
             if (moduleType) {
                 const rect = workspace.getBoundingClientRect();
-                const x = e.clientX - rect.left - 110;
-                const y = e.clientY - rect.top - 50;
+                const x = e.clientX - rect.left - 80;
+                const y = e.clientY - rect.top - 60;
                 this.addModule(moduleType, x, y);
+            }
+        });
+        
+        // 连线拖拽事件
+        document.addEventListener('mousemove', (e) => {
+            if (this.connectionManager.draggingConnection) {
+                this.connectionManager.updateDrag(e.clientX, e.clientY);
+            }
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+            if (this.connectionManager.draggingConnection && e.target.classList.contains('port')) {
+                const port = e.target;
+                const moduleId = port.closest('.calc-module').id;
+                const portType = port.classList.contains('input') ? 'input' : 'output';
+                const portIndex = parseInt(port.getAttribute('data-index'));
+                
+                if (portType === 'input') {
+                    this.connectionManager.finishDrag(moduleId, portIndex);
+                    // 触发目标模块重新计算
+                    this.calculateModule(moduleId);
+                }
+            } else if (this.connectionManager.draggingConnection) {
+                this.connectionManager.cleanupDrag();
             }
         });
         
@@ -135,14 +400,26 @@ class ModularCalculator {
                 this.redo();
             }
             
-            // Escape 取消选择
+            // Escape 取消选择/取消连线
             if (e.key === 'Escape') {
                 this.selectModule(null);
+                if (this.connectionManager.draggingConnection) {
+                    this.connectionManager.cleanupDrag();
+                }
             }
         });
         
         // 窗口大小变化
-        window.addEventListener('resize', () => this.updateConnections());
+        window.addEventListener('resize', () => {
+            setTimeout(() => {
+                this.connectionManager.resizeCanvas();
+            }, 100);
+        });
+        
+        // 工作区缩放事件
+        workspace.addEventListener('mouseenter', () => {
+            this.connectionManager.resizeCanvas();
+        });
     }
     
     // 模块定义
@@ -154,15 +431,26 @@ class ModularCalculator {
             inputs: 0,
             outputs: 1,
             createBody: (id) => `
-                <div class="output-group">
-                    <label>数值</label>
-                    <input type="number" class="input-field" value="0" 
-                           data-module="${id}" data-output="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <!-- 无输入端口 -->
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
+                </div>
+                <div class="module-body">
+                    <div class="input-group">
+                        <label>数值</label>
+                        <input type="number" class="input-field" value="0" 
+                               data-module="${id}" data-output="0" step="any">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const input = document.querySelector(`input[data-module="${module.id}"][data-output="0"]`);
-                return parseFloat(input.value) || 0;
+                const value = parseFloat(input.value) || 0;
+                return value.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -173,15 +461,26 @@ class ModularCalculator {
             inputs: 0,
             outputs: 1,
             createBody: (id) => `
-                <div class="output-group">
-                    <label>值: <span id="sliderValue-${id}">50</span></label>
-                    <input type="range" class="input-field" min="0" max="100" value="50" 
-                           data-module="${id}" data-output="0" id="slider-${id}">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <!-- 无输入端口 -->
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
+                </div>
+                <div class="module-body">
+                    <div class="output-group">
+                        <label>值: <span id="sliderValue-${id}">50</span></label>
+                        <input type="range" class="input-field" min="0" max="100" value="50" 
+                               data-module="${id}" data-output="0" id="slider-${id}">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const slider = document.getElementById(`slider-${module.id}`);
-                return parseFloat(slider.value) || 0;
+                const value = parseFloat(slider.value) || 0;
+                return value.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -192,17 +491,27 @@ class ModularCalculator {
             inputs: 0,
             outputs: 1,
             createBody: (id) => `
-                <div class="output-group">
-                    <label>状态</label>
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="toggle-${id}" data-module="${id}" data-output="0" checked>
-                        <label for="toggle-${id}" class="toggle-label"></label>
+                <div class="module-ports">
+                    <div class="port-container">
+                        <!-- 无输入端口 -->
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
+                </div>
+                <div class="module-body">
+                    <div class="output-group">
+                        <label>状态</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="toggle-${id}" data-module="${id}" data-output="0" checked>
+                            <label for="toggle-${id}" class="toggle-label"></label>
+                        </div>
                     </div>
                 </div>
             `,
             calculate: (module) => {
                 const toggle = document.getElementById(`toggle-${module.id}`);
-                return toggle.checked ? 1 : 0;
+                return toggle.checked ? '1.000' : '0.000'; // 优化：三位小数精度
             }
         },
         
@@ -213,25 +522,31 @@ class ModularCalculator {
             inputs: 2,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>输入 A</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="输入 A"></div>
+                        <div class="port input" data-index="1" title="输入 B"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>输入 B</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="output-group">
-                    <label>结果 (A + B)</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>A:</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>B:</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const inputA = this.getInputValue(module, 0);
                 const inputB = this.getInputValue(module, 1);
-                return (inputA + inputB).toFixed(2);
+                const result = inputA + inputB;
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -242,25 +557,31 @@ class ModularCalculator {
             inputs: 2,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>输入 A</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="输入 A"></div>
+                        <div class="port input" data-index="1" title="输入 B"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>输入 B</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="output-group">
-                    <label>结果 (A - B)</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>A:</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>B:</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const inputA = this.getInputValue(module, 0);
                 const inputB = this.getInputValue(module, 1);
-                return (inputA - inputB).toFixed(2);
+                const result = inputA - inputB;
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -271,25 +592,31 @@ class ModularCalculator {
             inputs: 2,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>输入 A</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="输入 A"></div>
+                        <div class="port input" data-index="1" title="输入 B"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>输入 B</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="output-group">
-                    <label>结果 (A × B)</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>A:</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>B:</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const inputA = this.getInputValue(module, 0);
                 const inputB = this.getInputValue(module, 1);
-                return (inputA * inputB).toFixed(2);
+                const result = inputA * inputB;
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -300,26 +627,32 @@ class ModularCalculator {
             inputs: 2,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>被除数 (A)</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="被除数"></div>
+                        <div class="port input" data-index="1" title="除数"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>除数 (B)</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="output-group">
-                    <label>结果 (A ÷ B)</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>被除数:</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>除数:</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const inputA = this.getInputValue(module, 0);
                 const inputB = this.getInputValue(module, 1);
                 if (inputB === 0) return "错误: 除零";
-                return (inputA / inputB).toFixed(2);
+                const result = inputA / inputB;
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -330,25 +663,31 @@ class ModularCalculator {
             inputs: 2,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>数值</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="数值"></div>
+                        <div class="port input" data-index="1" title="百分比"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>百分比 (%)</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="output-group">
-                    <label>结果</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>数值:</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>百分比 (%):</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const value = this.getInputValue(module, 0);
                 const percentage = this.getInputValue(module, 1);
-                return (value * percentage / 100).toFixed(2);
+                const result = value * percentage / 100;
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -359,31 +698,37 @@ class ModularCalculator {
             inputs: 3,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>数值 A</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="数值 A"></div>
+                        <div class="port input" data-index="1" title="数值 B"></div>
+                        <div class="port input" data-index="2" title="数值 C"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>数值 B</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="input-group">
-                    <label>数值 C</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="2" step="any">
-                </div>
-                <div class="output-group">
-                    <label>平均值</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>A:</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>B:</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>C:</label>
+                        <input type="number" class="input-field" data-input="2" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const sum = this.getInputValue(module, 0) + 
                            this.getInputValue(module, 1) + 
                            this.getInputValue(module, 2);
-                return (sum / 3).toFixed(2);
+                const result = sum / 3;
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -394,25 +739,31 @@ class ModularCalculator {
             inputs: 2,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>底数 (x)</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="底数"></div>
+                        <div class="port input" data-index="1" title="指数"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>指数 (y)</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="1" step="any">
-                </div>
-                <div class="output-group">
-                    <label>结果 (x^y)</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>底数 (x):</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入">
+                    </div>
+                    <div class="input-group">
+                        <label>指数 (y):</label>
+                        <input type="number" class="input-field" data-input="1" step="any" placeholder="或连线输入">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const base = this.getInputValue(module, 0);
                 const exponent = this.getInputValue(module, 1);
-                return Math.pow(base, exponent).toFixed(2);
+                const result = Math.pow(base, exponent);
+                return result.toFixed(3); // 优化：三位小数精度
             }
         },
         
@@ -423,20 +774,61 @@ class ModularCalculator {
             inputs: 1,
             outputs: 1,
             createBody: (id) => `
-                <div class="input-group">
-                    <label>数值 (x)</label>
-                    <input type="number" class="input-field" placeholder="自动或手动输入" 
-                           data-module="${id}" data-input="0" step="any" min="0">
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="输入"></div>
+                    </div>
+                    <div class="port-container">
+                        <div class="port output" data-index="0" title="输出"></div>
+                    </div>
                 </div>
-                <div class="output-group">
-                    <label>结果 (√x)</label>
-                    <div class="output-value" data-module="${id}" data-output="0">0</div>
+                <div class="module-body calculation-only">
+                    <div class="input-group">
+                        <label>数值 (x):</label>
+                        <input type="number" class="input-field" data-input="0" step="any" placeholder="或连线输入" min="0">
+                    </div>
                 </div>
             `,
             calculate: (module) => {
                 const value = this.getInputValue(module, 0);
                 if (value < 0) return "错误: 负数";
-                return Math.sqrt(value).toFixed(2);
+                const result = Math.sqrt(value);
+                return result.toFixed(3); // 优化：三位小数精度
+            }
+        },
+        
+        // 新增：结果显示模块
+        'display': {
+            name: '结果显示',
+            color: '#e74c3c',
+            icon: '<i class="fas fa-eye"></i>',
+            inputs: 1,
+            outputs: 0,
+            createBody: (id) => `
+                <div class="module-ports">
+                    <div class="port-container">
+                        <div class="port input" data-index="0" title="输入"></div>
+                    </div>
+                    <div class="port-container">
+                        <!-- 无输出端口 -->
+                    </div>
+                </div>
+                <div class="module-body display-module">
+                    <div class="output-group">
+                        <div class="output-value" data-module="${id}">0.000</div>
+                    </div>
+                </div>
+            `,
+            calculate: (module) => {
+                const value = this.getInputValue(module, 0);
+                // 优化：三位小数精度，如果是数字则格式化，否则显示原值
+                if (typeof value === 'number' && !isNaN(value)) {
+                    return value.toFixed(3);
+                } else if (typeof value === 'string' && value.includes('错误')) {
+                    return value;
+                } else {
+                    return '0.000';
+                }
             }
         }
     };
@@ -456,8 +848,8 @@ class ModularCalculator {
         const workspace = document.getElementById('workspaceArea');
         if (x === null || y === null) {
             const rect = workspace.getBoundingClientRect();
-            x = (rect.width - 220) / 2;
-            y = (rect.height - 200) / 2;
+            x = (rect.width - 160) / 2;
+            y = (rect.height - 120) / 2;
         }
         
         // 创建模块对象
@@ -475,7 +867,7 @@ class ModularCalculator {
         
         // 创建DOM元素
         const moduleElement = document.createElement('div');
-        moduleElement.className = 'calc-module';
+        moduleElement.className = `calc-module ${type === 'display' ? 'display-module' : ''}`;
         moduleElement.id = id;
         moduleElement.style.left = `${x}px`;
         moduleElement.style.top = `${y}px`;
@@ -491,9 +883,7 @@ class ModularCalculator {
                     </button>
                 </div>
             </div>
-            <div class="module-body">
-                ${definition.createBody(id)}
-            </div>
+            ${definition.createBody(id)}
         `;
         
         workspace.appendChild(moduleElement);
@@ -522,7 +912,7 @@ class ModularCalculator {
     setupModuleEvents(element, id, definition) {
         // 点击选择模块
         element.addEventListener('click', (e) => {
-            if (!e.target.closest('[data-action="delete"]')) {
+            if (!e.target.closest('[data-action="delete"]') && !e.target.classList.contains('port')) {
                 this.selectModule(id);
             }
         });
@@ -539,7 +929,7 @@ class ModularCalculator {
         inputFields.forEach(field => {
             field.addEventListener('input', () => {
                 this.calculateModule(id);
-                this.updateConnections();
+                this.updateDependentModules(id);
             });
         });
         
@@ -551,7 +941,7 @@ class ModularCalculator {
             slider.addEventListener('input', () => {
                 sliderValue.textContent = slider.value;
                 this.calculateModule(id);
-                this.updateConnections();
+                this.updateDependentModules(id);
             });
         }
         
@@ -560,9 +950,40 @@ class ModularCalculator {
             const toggle = document.getElementById(`toggle-${id}`);
             toggle.addEventListener('change', () => {
                 this.calculateModule(id);
-                this.updateConnections();
+                this.updateDependentModules(id);
             });
         }
+        
+        // 端口连线事件
+        const ports = element.querySelectorAll('.port');
+        ports.forEach(port => {
+            port.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                const portType = port.classList.contains('input') ? 'input' : 'output';
+                const portIndex = parseInt(port.getAttribute('data-index'));
+                
+                if (portType === 'output') {
+                    this.connectionManager.startDrag(id, portIndex, e.clientX, e.clientY);
+                }
+            });
+            
+            port.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                const portType = port.classList.contains('input') ? 'input' : 'output';
+                const portIndex = parseInt(port.getAttribute('data-index'));
+                
+                if (portType === 'input' && this.connectionManager.draggingConnection) {
+                    const newConn = this.connectionManager.finishDrag(id, portIndex);
+                    if (newConn) {
+                        // 连接建立后，触发目标模块重新计算
+                        this.calculateModule(id);
+                        this.showNotification('连接建立成功', 'success');
+                    }
+                }
+            });
+        });
         
         // 使模块可拖动
         this.makeDraggable(element, id);
@@ -575,7 +996,9 @@ class ModularCalculator {
         let offsetX, offsetY;
         
         header.addEventListener('mousedown', (e) => {
-            if (e.target.closest('[data-action="delete"]')) return;
+            if (e.target.closest('[data-action="delete"]') || e.target.classList.contains('port')) {
+                return;
+            }
             
             isDragging = true;
             offsetX = e.clientX - element.offsetLeft;
@@ -613,7 +1036,8 @@ class ModularCalculator {
                 module.y = y;
             }
             
-            this.updateConnections();
+            // 更新连线
+            this.connectionManager.drawAll();
         };
         
         const stopDrag = () => {
@@ -623,25 +1047,28 @@ class ModularCalculator {
         };
     }
     
-    // 获取模块输入值
+    // 获取模块输入值（优化：支持连线输入）
     getInputValue(module, inputIndex) {
-        // 检查连接
-        for (const conn of this.connections) {
-            if (conn.targetModule === module.id && conn.targetInput === inputIndex) {
-                const sourceModule = this.modules.find(m => m.id === conn.sourceModule);
-                if (sourceModule) {
-                    return parseFloat(sourceModule.outputValues[conn.sourceOutput]) || 0;
+        // 1. 优先从连线获取值
+        const connections = this.connectionManager.getInputConnections(module.id, inputIndex);
+        if (connections.length > 0) {
+            const conn = connections[0];
+            const sourceModule = this.modules.find(m => m.id === conn.sourceModule);
+            if (sourceModule) {
+                const outputValue = sourceModule.outputValues[conn.sourcePort];
+                if (outputValue !== undefined) {
+                    // 如果输出值是字符串（如错误信息），直接返回
+                    if (typeof outputValue === 'string') {
+                        return outputValue;
+                    }
+                    return parseFloat(outputValue) || 0;
                 }
             }
         }
         
-        // 检查输入字段
-        const inputField = document.querySelector(`input[data-module="${module.id}"][data-input="${inputIndex}"]`);
-        if (inputField) {
-            return parseFloat(inputField.value) || 0;
-        }
-        
-        return 0;
+        // 2. 没有连线，则从自身输入框获取
+        const inputField = document.querySelector(`#${module.id} input[data-input="${inputIndex}"]`);
+        return inputField ? parseFloat(inputField.value) || 0 : 0;
     }
     
     // 计算模块
@@ -654,10 +1081,14 @@ class ModularCalculator {
         
         try {
             const result = definition.calculate(module);
-            module.outputValues[0] = result;
             
-            // 更新UI
-            const outputElement = document.querySelector(`.output-value[data-module="${moduleId}"]`);
+            // 更新模块输出值
+            if (definition.outputs > 0) {
+                module.outputValues[0] = result;
+            }
+            
+            // 更新UI显示
+            const outputElement = document.querySelector(`#${moduleId} .output-value`);
             if (outputElement) {
                 outputElement.textContent = result;
                 
@@ -682,11 +1113,12 @@ class ModularCalculator {
     
     // 更新依赖模块
     updateDependentModules(moduleId) {
-        for (const conn of this.connections) {
+        const connections = this.connectionManager.getConnectionsForModule(moduleId);
+        connections.forEach(conn => {
             if (conn.sourceModule === moduleId) {
                 this.calculateModule(conn.targetModule);
             }
-        }
+        });
     }
     
     // 执行所有计算
@@ -695,7 +1127,7 @@ class ModularCalculator {
             this.calculateModule(module.id);
         });
         
-        this.updateConnections();
+        this.connectionManager.drawAll();
         this.showNotification('所有计算已完成', 'success');
         
         // 添加到历史记录
@@ -762,9 +1194,13 @@ class ModularCalculator {
             `;
             
             for (let i = 0; i < definition.inputs; i++) {
+                const connections = this.connectionManager.getInputConnections(moduleId, i);
+                const connectionInfo = connections.length > 0 ? 
+                    `<small style="color: var(--primary-color);">已连接</small>` : '';
+                
                 propertiesHTML += `
                     <div class="property-item">
-                        <label class="property-label">输入 ${String.fromCharCode(65 + i)}</label>
+                        <label class="property-label">输入 ${String.fromCharCode(65 + i)} ${connectionInfo}</label>
                         <input type="number" class="property-input module-input" 
                                data-module="${moduleId}" data-input="${i}" 
                                value="${module.inputValues[i] || 0}" step="any">
@@ -787,7 +1223,7 @@ class ModularCalculator {
                     <div class="property-item">
                         <label class="property-label">输出 ${i + 1}</label>
                         <input type="text" class="property-input" 
-                               value="${module.outputValues[i] || 0}" readonly>
+                               value="${module.outputValues[i] || '0.000'}" readonly>
                     </div>
                 `;
             }
@@ -824,20 +1260,22 @@ class ModularCalculator {
     setupPropertyEvents(moduleId, definition) {
         // 模块名称
         const nameInput = document.querySelector('.module-name');
-        nameInput.addEventListener('change', (e) => {
-            const module = this.modules.find(m => m.id === moduleId);
-            if (module) {
-                module.name = e.target.value;
-                
-                // 更新模块标题
-                const title = document.querySelector(`#${moduleId} .module-title span`);
-                if (title) {
-                    title.textContent = e.target.value;
+        if (nameInput) {
+            nameInput.addEventListener('change', (e) => {
+                const module = this.modules.find(m => m.id === moduleId);
+                if (module) {
+                    module.name = e.target.value;
+                    
+                    // 更新模块标题
+                    const title = document.querySelector(`#${moduleId} .module-title span`);
+                    if (title) {
+                        title.textContent = e.target.value;
+                    }
+                    
+                    this.addHistory('重命名模块', { id: moduleId, name: e.target.value });
                 }
-                
-                this.addHistory('重命名模块', { id: moduleId, name: e.target.value });
-            }
-        });
+            });
+        }
         
         // 位置
         document.querySelectorAll('[data-property="x"], [data-property="y"]').forEach(input => {
@@ -852,7 +1290,7 @@ class ModularCalculator {
                         element.style[property] = `${module[property]}px`;
                     }
                     
-                    this.updateConnections();
+                    this.connectionManager.drawAll();
                 }
             });
         });
@@ -865,21 +1303,26 @@ class ModularCalculator {
                 if (module) {
                     module.inputValues[inputIndex] = parseFloat(e.target.value) || 0;
                     this.calculateModule(moduleId);
-                    this.updateConnections();
                 }
             });
         });
         
         // 重新计算按钮
-        document.getElementById('recalculateBtn').addEventListener('click', () => {
-            this.calculateModule(moduleId);
-            this.showNotification('模块已重新计算', 'info');
-        });
+        const recalcBtn = document.getElementById('recalculateBtn');
+        if (recalcBtn) {
+            recalcBtn.addEventListener('click', () => {
+                this.calculateModule(moduleId);
+                this.showNotification('模块已重新计算', 'info');
+            });
+        }
         
         // 复制按钮
-        document.getElementById('cloneBtn').addEventListener('click', () => {
-            this.cloneModule(moduleId);
-        });
+        const cloneBtn = document.getElementById('cloneBtn');
+        if (cloneBtn) {
+            cloneBtn.addEventListener('click', () => {
+                this.cloneModule(moduleId);
+            });
+        }
     }
     
     // 克隆模块
@@ -892,7 +1335,7 @@ class ModularCalculator {
             newModule.name = `${module.name} (副本)`;
             newModule.inputValues = [...module.inputValues];
             
-            // 更新UI
+            // 更新UI中的模块名称
             const title = document.querySelector(`#${newModule.id} .module-title span`);
             if (title) {
                 title.textContent = newModule.name;
@@ -900,7 +1343,9 @@ class ModularCalculator {
             
             // 复制输入值
             for (let i = 0; i < module.inputValues.length; i++) {
-                const inputField = document.querySelector(`input[data-module="${newModule.id}"][data-input="${i}"]`);
+                const inputField = document.querySelector(
+                    `#${newModule.id} input[data-input="${i}"]`
+                );
                 if (inputField) {
                     inputField.value = module.inputValues[i];
                 }
@@ -940,9 +1385,7 @@ class ModularCalculator {
             this.modules = this.modules.filter(m => m.id !== moduleId);
             
             // 移除连接
-            this.connections = this.connections.filter(c => 
-                c.sourceModule !== moduleId && c.targetModule !== moduleId
-            );
+            this.connectionManager.removeConnectionsTo(moduleId);
             
             // 移除DOM元素
             const element = document.getElementById(moduleId);
@@ -962,7 +1405,6 @@ class ModularCalculator {
             
             // 更新UI
             this.updateUI();
-            this.updateConnections();
             
             // 添加到历史记录
             this.addHistory('删除模块', { id: moduleId, name: module.name });
@@ -983,7 +1425,8 @@ class ModularCalculator {
             });
             
             this.modules = [];
-            this.connections = [];
+            this.connectionManager.connections = [];
+            this.connectionManager.drawAll();
             this.selectedModuleId = null;
             
             // 显示空工作区
@@ -992,7 +1435,6 @@ class ModularCalculator {
             
             // 更新UI
             this.updateUI();
-            this.updateConnections();
             
             // 添加到历史记录
             this.addHistory('清空工作区');
@@ -1020,24 +1462,34 @@ class ModularCalculator {
         // 添加示例模块
         const input1 = this.addModule('number-input', 50, 50);
         const input2 = this.addModule('number-input', 50, 200);
-        const addition = this.addModule('addition', 300, 125);
-        const percentage = this.addModule('percentage', 550, 125);
+        const addition = this.addModule('addition', 250, 125);
+        const display = this.addModule('display', 450, 125);
         
         // 设置示例数据
-        if (input1 && input2 && addition && percentage) {
+        if (input1 && input2 && addition && display) {
             // 设置输入值
-            const input1Field = document.querySelector(`input[data-module="${input1.id}"][data-output="0"]`);
-            const input2Field = document.querySelector(`input[data-module="${input2.id}"][data-output="0"]`);
-            const percentageInput = document.querySelector(`input[data-module="${percentage.id}"][data-input="1"]`);
+            const input1Field = document.querySelector(`#${input1.id} input`);
+            const input2Field = document.querySelector(`#${input2.id} input`);
             
-            if (input1Field) input1Field.value = 100;
-            if (input2Field) input2Field.value = 50;
-            if (percentageInput) percentageInput.value = 15;
+            if (input1Field) input1Field.value = 15.5;
+            if (input2Field) input2Field.value = 25.3;
             
-            // 计算所有模块
-            this.calculateAll();
+            // 计算初始值
+            this.calculateModule(input1.id);
+            this.calculateModule(input2.id);
+            this.calculateModule(addition.id);
             
-            this.showNotification('已添加示例计算流程', 'success');
+            // 建立连线
+            setTimeout(() => {
+                this.connectionManager.addConnection(input1.id, 0, addition.id, 0);
+                this.connectionManager.addConnection(input2.id, 0, addition.id, 1);
+                this.connectionManager.addConnection(addition.id, 0, display.id, 0);
+                
+                // 重新计算
+                this.calculateAll();
+                
+                this.showNotification('已添加示例计算流程', 'success');
+            }, 100);
         }
     }
     
@@ -1052,8 +1504,8 @@ class ModularCalculator {
                 inputValues: module.inputValues,
                 outputValues: module.outputValues
             })),
-            connections: this.connections,
-            version: '1.0',
+            connections: this.connectionManager.connections,
+            version: '1.1',
             exportedAt: new Date().toISOString()
         };
         
@@ -1093,13 +1545,18 @@ class ModularCalculator {
                     
                     // 创建模块
                     config.modules.forEach(moduleConfig => {
-                        const module = this.addModule(moduleConfig.type, moduleConfig.x, moduleConfig.y);
+                        const module = this.addModule(
+                            moduleConfig.type, 
+                            moduleConfig.x, 
+                            moduleConfig.y
+                        );
+                        
                         if (module) {
                             module.name = moduleConfig.name;
                             module.inputValues = moduleConfig.inputValues || [];
                             module.outputValues = moduleConfig.outputValues || [];
                             
-                            // 更新UI
+                            // 更新UI中的模块名称
                             const title = document.querySelector(`#${module.id} .module-title span`);
                             if (title) {
                                 title.textContent = module.name;
@@ -1108,7 +1565,7 @@ class ModularCalculator {
                             // 设置输入值
                             moduleConfig.inputValues.forEach((value, index) => {
                                 const inputField = document.querySelector(
-                                    `input[data-module="${module.id}"][data-input="${index}"]`
+                                    `#${module.id} input[data-input="${index}"]`
                                 );
                                 if (inputField) {
                                     inputField.value = value;
@@ -1119,8 +1576,17 @@ class ModularCalculator {
                         }
                     });
                     
-                    this.connections = config.connections || [];
-                    this.updateConnections();
+                    // 恢复连接
+                    if (config.connections && Array.isArray(config.connections)) {
+                        config.connections.forEach(conn => {
+                            this.connectionManager.addConnection(
+                                conn.sourceModule, 
+                                conn.sourcePort,
+                                conn.targetModule, 
+                                conn.targetPort
+                            );
+                        });
+                    }
                     
                     this.showNotification('配置已导入', 'success');
                     this.addHistory('导入配置');
@@ -1141,7 +1607,7 @@ class ModularCalculator {
     saveProject() {
         const project = {
             modules: this.modules,
-            connections: this.connections,
+            connections: this.connectionManager.connections,
             savedAt: new Date().toISOString()
         };
         
@@ -1163,37 +1629,58 @@ class ModularCalculator {
                 });
                 
                 this.modules = [];
-                this.connections = project.connections || [];
+                this.connectionManager.connections = [];
                 
                 // 创建模块
-                project.modules.forEach(moduleConfig => {
-                    const module = this.addModule(moduleConfig.type, moduleConfig.x, moduleConfig.y);
-                    if (module) {
-                        module.name = moduleConfig.name;
-                        module.inputValues = moduleConfig.inputValues || [];
-                        module.outputValues = moduleConfig.outputValues || [];
+                if (project.modules && Array.isArray(project.modules)) {
+                    project.modules.forEach(moduleConfig => {
+                        const module = this.addModule(
+                            moduleConfig.type, 
+                            moduleConfig.x, 
+                            moduleConfig.y
+                        );
                         
-                        // 更新UI
-                        const title = document.querySelector(`#${module.id} .module-title span`);
-                        if (title) {
-                            title.textContent = module.name;
-                        }
-                        
-                        // 设置输入值
-                        moduleConfig.inputValues.forEach((value, index) => {
-                            const inputField = document.querySelector(
-                                `input[data-module="${module.id}"][data-input="${index}"]`
-                            );
-                            if (inputField) {
-                                inputField.value = value;
+                        if (module) {
+                            module.name = moduleConfig.name;
+                            module.inputValues = moduleConfig.inputValues || [];
+                            module.outputValues = moduleConfig.outputValues || [];
+                            
+                            // 更新UI中的模块名称
+                            const title = document.querySelector(`#${module.id} .module-title span`);
+                            if (title) {
+                                title.textContent = module.name;
                             }
-                        });
-                        
-                        this.calculateModule(module.id);
-                    }
-                });
+                            
+                            // 设置输入值
+                            if (moduleConfig.inputValues) {
+                                moduleConfig.inputValues.forEach((value, index) => {
+                                    const inputField = document.querySelector(
+                                        `#${module.id} input[data-input="${index}"]`
+                                    );
+                                    if (inputField) {
+                                        inputField.value = value;
+                                    }
+                                });
+                            }
+                            
+                            this.calculateModule(module.id);
+                        }
+                    });
+                }
                 
-                this.updateConnections();
+                // 恢复连接
+                if (project.connections && Array.isArray(project.connections)) {
+                    project.connections.forEach(conn => {
+                        this.connectionManager.addConnection(
+                            conn.sourceModule, 
+                            conn.sourcePort,
+                            conn.targetModule, 
+                            conn.targetPort
+                        );
+                    });
+                }
+                
+                this.connectionManager.drawAll();
                 this.showNotification('已加载保存的项目', 'info');
             }
         } catch (error) {
@@ -1202,23 +1689,11 @@ class ModularCalculator {
         }
     }
     
-    // 更新连接
-    updateConnections() {
-        // 清除现有连接线
-        document.querySelectorAll('.connection').forEach(el => el.remove());
-        
-        // 简化：这里不实现可视化连线
-        // 实际应用中可以绘制连接线
-        
-        // 更新连接计数
-        this.updateUI();
-    }
-    
     // 更新UI
     updateUI() {
         // 更新模块计数
         document.getElementById('moduleCount').textContent = `${this.modules.length} 个模块`;
-        document.getElementById('connectionCount').textContent = `${this.connections.length} 个连接`;
+        document.getElementById('connectionCount').textContent = `${this.connectionManager.connections.length} 个连接`;
         document.getElementById('infoModuleCount').textContent = this.modules.length;
     }
     
@@ -1241,6 +1716,11 @@ class ModularCalculator {
         
         localStorage.setItem('calculatorTheme', this.isDarkTheme ? 'dark' : 'light');
         this.showNotification(`已切换到${this.isDarkTheme ? '深色' : '浅色'}主题`, 'info');
+        
+        // 重绘连线以适应主题变化
+        setTimeout(() => {
+            this.connectionManager.drawAll();
+        }, 100);
     }
     
     // 过滤模块
@@ -1332,7 +1812,6 @@ class ModularCalculator {
     
     // 重做
     redo() {
-        // 简化实现
         this.showNotification('重做功能开发中', 'info');
     }
     
