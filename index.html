@@ -194,6 +194,16 @@
                                     <p>计算 √x</p>
                                 </div>
                             </div>
+                            <!-- 新增：结果显示模块 -->
+                            <div class="module-card" data-type="display">
+                                <div class="module-icon danger">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                                <div class="module-info">
+                                    <h4>结果显示</h4>
+                                    <p>显示计算结果</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -234,6 +244,7 @@
                     </div>
                     
                     <!-- 模块将在这里动态生成 -->
+                    <!-- Canvas连线画布将通过JS动态添加 -->
                 </div>
                 
                 <div class="workspace-footer">
@@ -279,7 +290,7 @@
                         <div class="info-grid">
                             <div class="info-item">
                                 <span>版本</span>
-                                <strong>1.0.0</strong>
+                                <strong>1.1.0</strong>
                             </div>
                             <div class="info-item">
                                 <span>模块数</span>
@@ -326,6 +337,7 @@
                     <ol>
                         <li>从左侧模块库选择模块（点击或拖拽）</li>
                         <li>将模块添加到工作区</li>
+                        <li><strong>新：拖拽端口建立连线连接数据流</strong></li>
                         <li>点击模块设置输入值</li>
                         <li>系统会自动计算并显示结果</li>
                     </ol>
@@ -355,6 +367,13 @@
                                 <p>执行复杂计算</p>
                             </div>
                         </div>
+                        <div class="module-type">
+                            <div class="type-icon danger"><i class="fas fa-eye"></i></div>
+                            <div class="type-info">
+                                <h4>结果显示</h4>
+                                <p>显示计算结果（三位小数）</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -377,6 +396,10 @@
                             <kbd>Delete</kbd>
                             <span>删除选中模块</span>
                         </div>
+                        <div class="shortcut-item">
+                            <kbd>Esc</kbd>
+                            <span>取消连线/选择</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -391,18 +414,5 @@
 
     <!-- 脚本 -->
     <script src="script.js"></script>
-    
-    <!-- 服务 worker 注册 -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js').then(registration => {
-                    console.log('ServiceWorker 注册成功: ', registration.scope);
-                }).catch(err => {
-                    console.log('ServiceWorker 注册失败: ', err);
-                });
-            });
-        }
-    </script>
 </body>
 </html>
